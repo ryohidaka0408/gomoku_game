@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gomoku Master</title>
+    <style>
+        :root {
+            --board-color: #e3c16f;
+            --board-line: #5d4037;
+            --stone-shadow: rgba(0, 0, 0, 0.4);
+            --highlight: rgba(255, 255, 255, 0.4);
+            --bg-color: #2c3e50;
+            --text-color: #ecf0f1;
+            --primary-btn: #3498db;
+            --secondary-btn: #95a5a6;
+            --accent: #e74c3c;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2vh 0;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: min(5vh, 2rem);
+            letter-spacing: 2px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #status-bar {
+            margin-top: 1vh;
+            font-size: min(3vh, 1.2rem);
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .turn-indicator {
+            padding: 0.5em 1em;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .turn-indicator.active {
+            background: var(--primary-btn);
+            box-shadow: 0 0 10px var(--primary-btn);
+            font-weight: bold;
+        }
+
+        #board-wrapper {
+            position: relative;
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 600px;
+            max-height: 600px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            margin: 10px;
+        }
+
+        #board {
+            width: 100%;
+            height: 100%;
+            background-color: var(--board-color);
+            background-image:
+                linear-gradient(45deg, rgba(0, 0, 0, 0.03) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.03) 75%, rgba(0, 0, 0, 0.03)),
+                linear-gradient(45deg, rgba(0, 0, 0, 0.03) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.03) 75%, rgba(0, 0, 0, 0.03));
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            padding: 2%;
+            /* 枠外の余白 */
+            border: 5px solid #8d6e63;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        /* 木目をさらにリアルにするためのノイズテクスチャ的なオーバーレイ */
+        #board::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxmaWx0ZXIgaWQ9Im4iPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjUiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ0cmFuc3BhcmVudCIvPxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==');
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .cell {
+            position: relative;
+            cursor: pointer;
+        }
+
+        /* 罫線 */
+        .cell::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: var(--board-line);
+            z-index: 1;
+        }
+
+        .cell::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            height: 100%;
+            width: 1px;
+            background: var(--board-line);
+            z-index: 1;
+        }
+
+        /* 星（天元など） */
+        .star-point::after {
+            content: '';
+            position: absolute;
+            width: 15%;
+            height: 15%;
+            background: var(--board-line);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+
+        .stone {
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            z-index: 5;
+            box-shadow: 2px 2px 4px var(--stone-shadow);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .stone.placed {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+        }
+
+        /* 最後の手のハイライト */
+        .stone.last-move::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%;
+            height: 30%;
+            background-color: rgba(255, 0, 0, 0.6);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        footer {
+            width: 100%;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        button {
+            background: var(--secondary-btn);
+            border: none;
+            padding: 12px 24px;
+            color: white;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        button.primary {
+            background: var(--primary-btn);
+        }
+
+        button.danger {
+            background: var(--accent);
+        }
+
+        #thinking-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            border-radius: 4px;
+        }
+
+        #thinking-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #confetti-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* モーダル */
+        #message-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #message-modal.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            max-width: 80%;
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            color: var(--board-line);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <header>
+            <h1>GOMOKU</h1>
+            <div id="status-bar">
+                <div id="p1-indicator" class="turn-indicator active">Black</div>
+                <div id="mode-display">vs CPU</div>
+                <div id="p2-indicator" class="turn-indicator">White</div>
+            </div>
+        </header>
+
+        <div id="board-wrapper">
+            <div id="board">
+                <!-- JSでセル生成 -->
+            </div>
+            <div id="thinking-overlay">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <footer>
+            <button id="reset-btn" class="danger">Reset</button>
+            <button id="mode-btn" class="primary">Mode: CPU</button>
+        </footer>
+    </div>
+
+    <canvas id="confetti-layer"></canvas>
+
+    <div id="message-modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Winner!</h2>
+            <p id="modal-message">Black wins!</p>
+            <button id="modal-ok-btn" class="primary">OK</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Constants & Config
+         */
+        const BOARD_SIZE = 15;
+        const EMPTY = 0;
+        const BLACK = 1;
+        const WHITE = 2; // AI is usually White in 1P mode
+
+        // Game State
+        let board = [];
+        let currentPlayer = BLACK;
+        let gameMode = 'CPU'; // 'CPU' or 'PvP'
+        let isGameActive = false;
+        let lastMove = null;
+        let isProcessing = false;
+
+        // DOM Elements
+        const boardEl = document.getElementById('board');
+        const p1Ind = document.getElementById('p1-indicator');
+        const p2Ind = document.getElementById('p2-indicator');
+        const modeDisplay = document.getElementById('mode-display');
+        const resetBtn = document.getElementById('reset-btn');
+        const modeBtn = document.getElementById('mode-btn');
+        const thinkingOverlay = document.getElementById('thinking-overlay');
+        const messageModal = document.getElementById('message-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMsg = document.getElementById('modal-message');
+        const modalOkBtn = document.getElementById('modal-ok-btn');
+        const confettiCanvas = document.getElementById('confetti-layer');
+        const ctx = confettiCanvas.getContext('2d');
+
+        /**
+         * Initialization
+         */
+        function initGame() {
+            createBoardUI();
+            resetGame();
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function createBoardUI() {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    // 星（Star points）の描画
+                    if (isStarPoint(r, c)) {
+                        cell.classList.add('star-point');
+                    }
+
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function isStarPoint(r, c) {
+            // 15x15 board star points: (3,3), (3,11), (7,7), (11,3), (11,11)
+            const stars = [3, 7, 11];
+            return stars.includes(r) && stars.includes(c);
+        }
+
+        function resetGame() {
+            // Initialize board array
+            board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
+            currentPlayer = BLACK;
+            isGameActive = true;
+            isProcessing = false;
+            lastMove = null;
+
+            // UI Reset
+            document.querySelectorAll('.stone').forEach(el => el.remove());
+            updateTurnIndicator();
+            hideModal();
+            stopConfetti();
+            hideThinking();
+        }
+
+        /**
+         * Game Logic
+         */
+        function handleCellClick(row, col) {
+            if (!isGameActive || isProcessing || board[row][col] !== EMPTY) return;
+
+            // PvP or Player's turn in CPU mode
+            if (gameMode === 'PvP' || (gameMode === 'CPU' && currentPlayer === BLACK)) {
+                placeStone(row, col);
+            }
+        }
+
+        function placeStone(row, col) {
+            board[row][col] = currentPlayer;
+
+            // UI Render
+            const cellIndex = row * BOARD_SIZE + col;
+            const cell = boardEl.children[cellIndex];
+            const stone = document.createElement('div');
+            stone.classList.add('stone', currentPlayer === BLACK ? 'black' : 'white');
+
+            // Remove previous last-move highlight
+            const prevLast = document.querySelector('.last-move');
+            if (prevLast) prevLast.classList.remove('last-move');
+
+            stone.classList.add('last-move');
+            cell.appendChild(stone);
+
+            // Animation trigger
+            requestAnimationFrame(() => {
+                stone.classList.add('placed');
+            });
+
+            lastMove = { row, col };
+
+            // Check Win
+            if (checkWin(row, col, currentPlayer)) {
+                endGame(currentPlayer);
+                return;
+            }
+
+            // Check Draw (Board Full)
+            if (isBoardFull()) {
+                endGame(null); // Draw
+                return;
+            }
+
+            // Switch Turn
+            currentPlayer = currentPlayer === BLACK ? WHITE : BLACK;
+            updateTurnIndicator();
+
+            // CPU Turn Trigger
+            if (gameMode === 'CPU' && currentPlayer === WHITE && isGameActive) {
+                isProcessing = true;
+                showThinking();
+                // Simulate thinking time
+                setTimeout(() => {
+                    cpuMove();
+                    isProcessing = false;
+                    hideThinking();
+                }, 800);
+            }
+        }
+
+        function updateTurnIndicator() {
+            if (currentPlayer === BLACK) {
+                p1Ind.classList.add('active');
+                p2Ind.classList.remove('active');
+            } else {
+                p1Ind.classList.remove('active');
+                p2Ind.classList.add('active');
+            }
+        }
+
+        /**
+         * Win Check Algorithm
+         */
+        function checkWin(row, col, player) {
+            const directions = [
+                [0, 1],   // Horizontal
+                [1, 0],   // Vertical
+                [1, 1],   // Diagonal \
+                [1, -1]   // Diagonal /
+            ];
+
+            for (const [dr, dc] of directions) {
+                let count = 1;
+
+                // Check forward
+                for (let i = 1; i < 5; i++) {
+                    const r = row + dr * i;
+                    const c = col + dc * i;
+                    if (isValid(r, c) && board[r][c] === player) count++;
+                    else break;
+                }
+
+                // Check backward
+                for (let i = 1; i < 5; i++) {
+                    const r = row - dr * i;
+                    const c = col - dc * i;
+                    if (isValid(r, c) && board[r][c] === player) count++;
+                    else break;
+                }
+
+                // Score check
+                // 黒番は長連（Overline）禁止 -> 5個ちょうどのみ勝ち
+                if (player === BLACK) {
+                    if (count === 5) return true;
+                } else {
+                    // 白番は長連も勝ち（5個以上）
+                    if (count >= 5) return true;
+                }
+            }
+            return false;
+        }
+
+        function isValid(r, c) {
+            return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE;
+        }
+
+        function isBoardFull() {
+            return board.every(row => row.every(cell => cell !== EMPTY));
+        }
+
+        function endGame(winner) {
+            isGameActive = false;
+            let msg = "Draw Game!";
+            let title = "Game Over";
+
+            if (winner) {
+                title = "Winner!";
+                const winnerName = winner === BLACK ? "Black" : "White";
+                msg = `${winnerName} Wins!`;
+                startConfetti();
+            }
+
+            showModal(title, msg);
+        }
+
+        /**
+         * AI (CPU) Logic - Evaluation Function
+         */
+        function cpuMove() {
+            // 簡易的なMinMaxまたは評価値最大の手を選ぶ
+            // ここではGreedyに最も評価値が高い場所を選ぶ
+            let bestScore = -Infinity;
+            let bestMoves = [];
+
+            // センター付近から探索（効率化のため）
+            // とりあえず全探索
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === EMPTY) {
+                        // 評価計算
+                        // 自分の攻撃(WHITE)と相手の防御(BLACK)を評価
+                        const score = evaluatePosition(r, c, WHITE) + evaluatePosition(r, c, BLACK) * 0.8;
+                        // 攻撃重視だが、防御もかなり重要視する
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMoves = [{ r, c }];
+                        } else if (score === bestScore) {
+                            bestMoves.push({ r, c });
+                        }
+                    }
+                }
+            }
+
+            if (bestMoves.length > 0) {
+                // ランダム要素（同じスコアならランダム）
+                const move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+                placeStone(move.r, move.c);
+            } else {
+                // 万が一置く場所がない場合（引き分け処理前）
+            }
+        }
+
+        /**
+         * 評価関数
+         * 指定した座標(r, c)に player の石を置いた時の「価値」を計算する
+         * 単純化するため、その点を通る4方向のラインの状況を見てスコア付与
+         */
+        function evaluatePosition(row, col, player) {
+            let totalScore = 0;
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+            // 仮に置いてみる
+            board[row][col] = player;
+
+            for (const [dr, dc] of directions) {
+                totalScore += evaluateLine(row, col, dr, dc, player);
+            }
+
+            // 元に戻す
+            board[row][col] = EMPTY;
+
+            return totalScore;
+        }
+
+        function evaluateLine(row, col, dr, dc, player) {
+            let count = 1;
+            let openEnds = 0;
+
+            // 正方向探索
+            let r = row + dr;
+            let c = col + dc;
+            while (isValid(r, c) && board[r][c] === player) {
+                count++;
+                r += dr;
+                c += dc;
+            }
+            if (isValid(r, c) && board[r][c] === EMPTY) openEnds++;
+
+            // 逆方向探索
+            r = row - dr;
+            c = col - dc;
+            while (isValid(r, c) && board[r][c] === player) {
+                count++;
+                r -= dr;
+                c -= dc;
+            }
+            if (isValid(r, c) && board[r][c] === EMPTY) openEnds++;
+
+            // スコアリング
+            if (count >= 5) return 100000; // 勝利確定
+            if (count === 4) {
+                if (openEnds >= 1) return 10000; // 4連は止めるか作るか必須
+                // 両端塞がってる4連は意味なし（5になれない）
+            }
+            if (count === 3) {
+                if (openEnds === 2) return 5000; // 両側開きの3連は強い
+                if (openEnds === 1) return 500;  // 片側開きはまあまあ
+            }
+            if (count === 2) {
+                if (openEnds === 2) return 100;
+            }
+            if (count === 1) {
+                return 10; // 中央に近いほど高いなどを加味してもよいが今回は簡易
+            }
+
+            return 0;
+        }
+
+        /**
+         * UI Helpers
+         */
+        resetBtn.addEventListener('click', () => {
+            if (confirm('本当にリセットしますか？')) resetGame();
+        });
+
+        modeBtn.addEventListener('click', () => {
+            if (gameMode === 'CPU') {
+                gameMode = 'PvP';
+                modeBtn.textContent = 'Mode: 2P(PvP)';
+                modeDisplay.textContent = '2P';
+            } else {
+                gameMode = 'CPU';
+                modeBtn.textContent = 'Mode: CPU';
+                modeDisplay.textContent = 'vs CPU';
+            }
+            resetGame();
+        });
+
+        modalOkBtn.addEventListener('click', () => {
+            hideModal();
+            stopConfetti();
+            resetGame();
+        });
+
+        function showThinking() {
+            thinkingOverlay.classList.add('visible');
+        }
+
+        function hideThinking() {
+            thinkingOverlay.classList.remove('visible');
+        }
+
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMsg.textContent = message;
+            messageModal.classList.add('visible');
+        }
+
+        function hideModal() {
+            messageModal.classList.remove('visible');
+        }
+
+        /**
+         * Confetti Effect (Canvas)
+         */
+        let confettiActive = false;
+        let particles = [];
+
+        function resizeCanvas() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+
+        function startConfetti() {
+            if (confettiActive) return;
+            confettiActive = true;
+            particles = [];
+            for (let i = 0; i < 150; i++) {
+                particles.push(createParticle());
+            }
+            animateConfetti();
+        }
+
+        function createParticle() {
+            return {
+                x: Math.random() * confettiCanvas.width,
+                y: Math.random() * confettiCanvas.height - confettiCanvas.height,
+                size: Math.random() * 8 + 4,
+                speedY: Math.random() * 3 + 2,
+                speedX: Math.random() * 2 - 1,
+                color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                rotation: Math.random() * 360,
+                rotationSpeed: Math.random() * 10 - 5
+            };
+        }
+
+        function stopConfetti() {
+            confettiActive = false;
+            ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        }
+
+        function animateConfetti() {
+            if (!confettiActive) return;
+            ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+            particles.forEach((p, index) => {
+                p.y += p.speedY;
+                p.x += p.speedX;
+                p.rotation += p.rotationSpeed;
+
+                if (p.y > confettiCanvas.height) {
+                    particles[index] = createParticle(); // Reset to top
+                }
+
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation * Math.PI / 180);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                ctx.restore();
+            });
+
+            requestAnimationFrame(animateConfetti);
+        }
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+
+</html>
