@@ -221,13 +221,108 @@
             }
         }
 
-        footer {
-            width: 100%;
+        /* Menu Styles */
+        #menu-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            z-index: 110;
+            /* Overlayより上 */
             padding: 10px;
+            box-shadow: none;
+        }
+
+        .hamburger {
+            width: 30px;
+            height: 3px;
+            background-color: var(--text-color);
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .hamburger::before,
+        .hamburger::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 3px;
+            background-color: var(--text-color);
+            left: 0;
+            transition: all 0.3s;
+        }
+
+        .hamburger::before {
+            top: -10px;
+        }
+
+        .hamburger::after {
+            top: 10px;
+        }
+
+        /* Menu Open State Definitions */
+        body.menu-open #menu-btn .hamburger {
+            background-color: transparent;
+        }
+
+        body.menu-open #menu-btn .hamburger::before {
+            transform: rotate(45deg);
+            top: 0;
+        }
+
+        body.menu-open #menu-btn .hamburger::after {
+            transform: rotate(-45deg);
+            top: 0;
+        }
+
+        #side-menu {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 280px;
+            height: 100%;
+            background: rgba(44, 62, 80, 0.98);
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
+            flex-direction: column;
             justify-content: center;
-            gap: 15px;
-            z-index: 10;
+            align-items: center;
+            gap: 30px;
+            padding: 40px 20px;
+        }
+
+        body.menu-open #side-menu {
+            right: 0;
+        }
+
+        #side-menu button {
+            width: 100%;
+            max-width: 220px;
+            font-size: 1.1rem;
+            padding: 15px;
+        }
+
+        #menu-overlay-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            backdrop-filter: blur(2px);
+        }
+
+        body.menu-open #menu-overlay-bg {
+            opacity: 1;
+            pointer-events: all;
         }
 
         button {
@@ -346,9 +441,12 @@
     <div id="game-container">
         <header>
             <h1>GOMOKU</h1>
+            <button id="menu-btn" aria-label="Menu">
+                <div class="hamburger"></div>
+            </button>
             <div id="status-bar">
                 <div id="p1-indicator" class="turn-indicator active">Black</div>
-                <div id="mode-display">vs CPU</div>
+                <!-- <div id="mode-display">vs CPU</div> Removed from here -->
                 <div id="p2-indicator" class="turn-indicator">White</div>
             </div>
         </header>
@@ -362,10 +460,16 @@
             </div>
         </div>
 
-        <footer>
-            <button id="reset-btn" class="danger">Reset</button>
-            <button id="mode-btn" class="primary">Mode: CPU</button>
-        </footer>
+        <!-- Footer removed -->
+    </div>
+
+    <!-- Menu Overlay Elements -->
+    <div id="menu-overlay-bg"></div>
+    <div id="side-menu">
+        <h2 style="color:var(--board-color); margin-bottom: 10px; border-bottom: 2px solid var(--board-line);">MENU</h2>
+        <div id="current-mode-display" style="color:white; margin-bottom: 10px; font-size: 1.2rem;">Mode: vs CPU</div>
+        <button id="mode-btn" class="primary">Switch Mode</button>
+        <button id="reset-btn" class="danger">Reset Game</button>
     </div>
 
     <canvas id="confetti-layer"></canvas>
@@ -396,12 +500,18 @@
         let isProcessing = false;
 
         // DOM Elements
+        // DOM Elements
         const boardEl = document.getElementById('board');
         const p1Ind = document.getElementById('p1-indicator');
         const p2Ind = document.getElementById('p2-indicator');
-        const modeDisplay = document.getElementById('mode-display');
+        // const modeDisplay = document.getElementById('mode-display'); // Removed
+        const modeInfo = document.getElementById('current-mode-display'); // New
         const resetBtn = document.getElementById('reset-btn');
         const modeBtn = document.getElementById('mode-btn');
+
+        const menuBtn = document.getElementById('menu-btn'); // New
+        const menuOverlayBg = document.getElementById('menu-overlay-bg'); // New
+
         const thinkingOverlay = document.getElementById('thinking-overlay');
         const messageModal = document.getElementById('message-modal');
         const modalTitle = document.getElementById('modal-title');
@@ -708,21 +818,37 @@
         /**
          * UI Helpers
          */
+        /**
+         * UI Helpers
+         */
+
+        // Menu Toggle
+        function toggleMenu() {
+            document.body.classList.toggle('menu-open');
+        }
+
+        menuBtn.addEventListener('click', toggleMenu);
+        menuOverlayBg.addEventListener('click', toggleMenu);
+
         resetBtn.addEventListener('click', () => {
-            if (confirm('本当にリセットしますか？')) resetGame();
+            if (confirm('本当にリセットしますか？')) {
+                resetGame();
+                toggleMenu();
+            }
         });
 
         modeBtn.addEventListener('click', () => {
             if (gameMode === 'CPU') {
                 gameMode = 'PvP';
-                modeBtn.textContent = 'Mode: 2P(PvP)';
-                modeDisplay.textContent = '2P';
+                // modeBtn.textContent = 'Mode: 2P(PvP)';
+                modeInfo.textContent = 'Mode: 2P (PvP)';
             } else {
                 gameMode = 'CPU';
-                modeBtn.textContent = 'Mode: CPU';
-                modeDisplay.textContent = 'vs CPU';
+                // modeBtn.textContent = 'Mode: CPU';
+                modeInfo.textContent = 'Mode: vs CPU';
             }
             resetGame();
+            toggleMenu();
         });
 
         modalOkBtn.addEventListener('click', () => {
